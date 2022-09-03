@@ -21,9 +21,9 @@
     <Compile Include="src/Syntax.fs" />
     
     <!-- Generated files -->
-    <Compile Include="Parser.fsi" />
-    <Compile Include="Parser.fs" />
-    <Compile Include="Lexer.fs" />
+    <Compile Include="src/Parser.fsi" />
+    <Compile Include="src/Parser.fs" />
+    <Compile Include="src/Lexer.fs" />
   
     <Compile Include="Program.fs" />
   </ItemGroup>

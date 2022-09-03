@@ -1,5 +1,5 @@
 %{
-    open Syntax
+open Incremental.Syntax
 %}
 
 %token <float> NUMBER
@@ -7,12 +7,12 @@
 %token EOF LPAREN RPAREN
 
 %start parse
-%type <Expr> parse
+%type <Incremental.Syntax.Expr> parse
 
 %%
 
 parse: expr EOF             { $1 }
 
-expr: Number                { Number $1 }
+expr: NUMBER                { Number $1 }
     | expr OP expr          { Binop ($1, $2, $3) }
     | LPAREN expr RPAREN    { $2 }

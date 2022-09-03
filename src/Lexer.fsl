@@ -1,8 +1,8 @@
 {
-    open FSharp.Lang.Lexing
-    open Parser
+open FSharp.Text.Lexing
+open Parser
 
-    let lexeme lexbuf = LexBuffer<_>.LexemeString lexbuf
+let lexeme lexbuf = LexBuffer<_>.LexemeString lexbuf
 }
 
 let whitespace = [' ' '\t' '\n']

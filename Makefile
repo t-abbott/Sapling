@@ -2,5 +2,5 @@ all:
 	echo "todo"
 
 clean:
-	rm src/Parser.fsi src/Parser.fsi src/Lexer.fs
+	rm -f src/Parser.fsi src/Parser.fs src/Lexer.fs
 
