@@ -1,0 +1,18 @@
+%{
+    open Syntax
+%}
+
+%token <float> NUMBER
+%token <string> OP
+%token EOF LPAREN RPAREN
+
+%start parse
+%type <Expr> parse
+
+%%
+
+parse: expr EOF             { $1 }
+
+expr: Number                { Number $1 }
+    | expr OP expr          { Binop ($1, $2, $3) }
+    | LPAREN expr RPAREN    { $2 }
