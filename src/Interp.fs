@@ -1,24 +1,92 @@
-namespace Incremental
+module Incremental.Interp
 
-open Incremental.Syntax
+open Incremental.Expr
+open Incremental.Utils
 
+module Env = 
+    /// Represents an environment mapping names to their values
+    type T = Map<Name, EnvVal>
+    /// Expression values
+    and EnvVal =
+        | Val of Expr.T
+        | Closure of Expr.T * T
+    
+    let close (expr : Expr.T) env = Closure (expr, env)
 
-module Interp =
-    type Environment = Map<Name, Expr>
+exception EvalError of string * (Expr.T option)
 
-    exception EvalError of string
+/// Return a list of the free variables in an expression
+let rec freeVars = function
+    | Number _ -> []
+    | Var v -> [v]
+    | Binop (l, _, r) ->
+        union (freeVars l) (freeVars r) 
+    | LetIn (name, _, body) ->
+        without (freeVars body) name
+    | Fun (name, body) ->
+        without (freeVars body) name
+    | Apply (e1, e2) ->
+        union (freeVars e1) (freeVars e2)
 
-    let rec eval expr env =
-        match expr with
-        | Number n -> n
-        | Binop (l, op, r) ->
-            let op_fn = 
-                match op with
-                | "+" -> ( + )
-                | "-" -> ( - )
-                | _ ->
-                    let msg = sprintf "invalid operator '%s'" op in
-                    raise (EvalError msg)
-            in 
-                op_fn (eval l env) (eval r env)
+/// Return a list of the bound variables in an expression
+let rec boundVars = function
+    | LetIn (name, _, body) | Fun (name, body)->
+        name :: (boundVars body)
+    | _ -> []
 
+open Env
+
+let ops = ([ 
+    "+", ( + ); 
+    "-", ( - );
+    "*", ( * );
+    "/", ( / )
+] |> Map.ofList)
+
+/// Evaluate an expression `expr` with respect to an environment `env`
+let rec eval expr env =
+    match expr with
+    | Number _ -> Val expr
+    | Var v ->
+        (match (Map.tryFind v env) with
+        | Some e -> e
+        | None ->
+            let msg = "reference to unknown variable" in
+            raise (EvalError (msg, Some(expr))))
+    | Binop (l, op, r) ->
+        evalBinop (l, op, r) env
+    | LetIn (name, value, body) ->
+        eval body (Map.add name (eval value env) env)
+    | Fun _ ->
+        close expr env
+    | Apply (e1, e2) ->
+        let arg = eval e2 env in
+        match eval e1 env with
+        | Closure ((Fun (name, body)), closedEnv) ->
+            eval (body) (Map.add name arg closedEnv)
+        | _ ->
+            let msg = 
+                "tried to apply a value to a non-function expression"
+            in
+            raise (EvalError (msg, Some(expr)))
+
+and evalBinop (l, op, r) env = 
+    let op_fn =
+        (match (ops.TryFind op) with
+        | Some f -> f 
+        | None -> 
+            let msg = sprintf "unrecognised operator '%s'" op in
+            raise (EvalError (msg, None)))
+    in
+    match (evalNumber l env), (evalNumber r env) with
+    | (Number x), (Number y) -> Val (Number (op_fn x y))
+    | _ ->
+        failwith "unreachable"
+
+and evalNumber expr env =
+    match eval expr env with
+    | Val (Number n) -> Number n
+    | _ -> 
+        let msg = 
+            sprintf "expected expression to reduce to a number"  in
+        raise (EvalError (msg, Some(expr)))

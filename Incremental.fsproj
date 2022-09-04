@@ -8,6 +8,7 @@
     <FsLexOutputFolder>$(IntermediateOutputPath)src/</FsLexOutputFolder>
   </PropertyGroup>
   <ItemGroup>
+    <Compile Include="src/Utils.fs" />
     <FsYacc Include="src/Parser.fsy">
       <OtherFlags>--module Parser</OtherFlags>
     </FsYacc>

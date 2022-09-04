@@ -6,15 +6,26 @@ let lexeme lexbuf = LexBuffer<_>.LexemeString lexbuf
 }
 
 let whitespace = [' ' '\t' '\n']
-let operator = ['+' '-']
+
+let symbol = ['+' '-' '/' '*' '_' '?' '<' '>']
+
 let digit = ['0' - '9']
 let real = '-'? digit+ ('.' digit+)?
+
+let letter = ['a'-'z' 'A'-'Z']
+let ident = letter (letter | digit | symbol)*
 
 rule tokenize = parse
 | whitespace            { tokenize lexbuf }
 | real                  { lexeme lexbuf |> System.Double.Parse |> NUMBER }
-| operator              { lexeme lexbuf |> OP }
 | '('                   { LPAREN }
 | ')'                   { RPAREN }
+| "let"                 { LET }
+| "in"                  { IN }
+| '='                   { EQUALS }
+| "fun"                 { FUN }
+| "->"                  { ARROW }
+| symbol*               { lexeme lexbuf |> OP }
+| ident                 { lexeme lexbuf |> IDENT } 
 | eof                   { EOF }
 | _                     { lexeme lexbuf |> sprintf "parser error: %s" |> failwith }

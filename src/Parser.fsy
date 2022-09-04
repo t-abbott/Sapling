@@ -1,18 +1,28 @@
 %{
-open Incremental.Syntax
+open Incremental.Expr
 %}
 
 %token <float> NUMBER
 %token <string> OP
-%token EOF LPAREN RPAREN
+%token <string> IDENT
+%token LPAREN RPAREN
+%token LET IN EQUALS
+%token FUN ARROW
+%token EOF
+
+%left OP
 
 %start parse
-%type <Incremental.Syntax.Expr> parse
+%type <Incremental.Expr.T> parse
 
 %%
 
-parse: expr EOF             { $1 }
+parse: expr EOF                         { $1 }
 
-expr: NUMBER                { Number $1 }
-    | expr OP expr          { Binop ($1, $2, $3) }
-    | LPAREN expr RPAREN    { $2 }
+expr: NUMBER                            { Number $1 }
+    | IDENT                             { Var $1 }
+    | LPAREN expr RPAREN                { $2 }
+    | expr OP expr                      { Binop ($1, $2, $3) }
+    | LET IDENT EQUALS expr IN expr     { LetIn ($2, $4, $6) }
+    | FUN IDENT ARROW expr              { Fun ($2, $4) }
+    | expr expr                         { Apply ($1, $2) } 
