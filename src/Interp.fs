@@ -3,6 +3,8 @@ module Incremental.Interp
 open Incremental.Expr
 open Incremental.Utils
 
+exception EvalError of string
+
 module Env = 
     /// Represents an environment mapping names to their values
     type T = Map<Name, EnvVal>
@@ -12,8 +14,6 @@ module Env =
         | Closure of Expr.T * T
     
     let close (expr : Expr.T) env = Closure (expr, env)
-
-exception EvalError of string * (Expr.T option)
 
 /// Return a list of the free variables in an expression
 let rec freeVars = function
@@ -51,8 +51,10 @@ let rec eval expr env =
         (match (Map.tryFind v env) with
         | Some e -> e
         | None ->
-            let msg = "reference to unknown variable" in
-            raise (EvalError (msg, Some(expr))))
+            let msg = 
+                sprintf "reference to unknown variable '%s'" v
+            in
+            raise (EvalError msg))
     | Binop (l, op, r) ->
         evalBinop (l, op, r) env
     | LetIn (name, value, body) ->
@@ -66,9 +68,9 @@ let rec eval expr env =
             eval (body) (Map.add name arg closedEnv)
         | _ ->
             let msg = 
-                "tried to apply a value to a non-function expression"
+                sprintf "tried to apply a value to something that isn't a function in expression '%s'" (expr.ToString ())
             in
-            raise (EvalError (msg, Some(expr)))
+            raise (EvalError msg)            
 
 and evalBinop (l, op, r) env = 
     let op_fn =
@@ -76,7 +78,7 @@ and evalBinop (l, op, r) env =
         | Some f -> f 
         | None -> 
             let msg = sprintf "unrecognised operator '%s'" op in
-            raise (EvalError (msg, None)))
+            raise (EvalError msg))
     in
     match (evalNumber l env), (evalNumber r env) with
     | (Number x), (Number y) -> Val (Number (op_fn x y))
@@ -88,5 +90,5 @@ and evalNumber expr env =
     | Val (Number n) -> Number n
     | _ -> 
         let msg = 
-            sprintf "expected expression to reduce to a number"  in
-        raise (EvalError (msg, Some(expr)))
+            sprintf "expected expression to reduce to a number: '%s'" (expr.ToString ()) in
+        raise (EvalError msg)

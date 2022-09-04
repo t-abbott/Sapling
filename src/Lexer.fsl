@@ -25,7 +25,7 @@ rule tokenize = parse
 | '='                   { EQUALS }
 | "fun"                 { FUN }
 | "->"                  { ARROW }
-| symbol*               { lexeme lexbuf |> OP }
+| symbol+               { lexeme lexbuf |> OP }
 | ident                 { lexeme lexbuf |> IDENT } 
 | eof                   { EOF }
 | _                     { lexeme lexbuf |> sprintf "parser error: %s" |> failwith }

@@ -17,7 +17,10 @@ let run file =
     let res = eval ast Map.empty in        
     Console.WriteLine (ast.ToString ());
     Console.WriteLine (res.ToString ());
- 
+
+let printError (message : string) =
+    Console.Error.WriteLine ("error: " + message)
+    
 [<EntryPoint>]
 let main argv =
     if argv.Length <> 1 then
@@ -28,15 +31,10 @@ let main argv =
             run argv[0];
             0
         with
-        | EvalError(message, expr) ->
-            let estring = 
-                match expr with
-                | Some(e) -> "in expression " + e.ToString ()
-                | None -> ""
-            in
-            printfn "error: %s %s\n" message estring;
+        | EvalError(message) ->
+            printError message;
             1
-        | :? Exception as ex ->
-            printfn "error: %s" (ex.Message); 
+        | ex ->
+            printError ex.Message; 
             1
         
