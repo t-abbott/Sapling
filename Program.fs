@@ -4,7 +4,6 @@ open FSharp.Text.Lexing
 
 open Incremental
 open Incremental.Interp
-open Incremental.Utils
 
 let usage = "dotnet run -- <file>"
 
