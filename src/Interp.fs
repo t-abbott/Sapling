@@ -2,6 +2,7 @@ module Incremental.Interp
 
 open Incremental.Expr
 open Incremental.Utils
+open Incremental.Utils.Extensions
 
 exception EvalError of string
 
@@ -17,12 +18,16 @@ module Env =
 
 /// Return a list of the free variables in an expression
 let rec freeVars = function
+    | Unit -> []
+    | Bool _ -> []
     | Number _ -> []
     | Var v -> [v]
-    | Binop (l, _, r) ->
-        union (freeVars l) (freeVars r) 
     | LetIn (name, _, body) ->
         without (freeVars body) name
+    | Binop (l, _, r) ->
+        union (freeVars l) (freeVars r)
+    | IfThen (cond, e1, e2) ->
+        union (freeVars e1) (freeVars e1) |> union (freeVars cond)
     | Fun (name, body) ->
         without (freeVars body) name
     | Apply (e1, e2) ->
@@ -46,7 +51,7 @@ let ops = ([
 /// Evaluate an expression `expr` with respect to an environment `env`
 let rec eval expr env =
     match expr with
-    | Number _ -> Val expr
+    | Number _  | Bool _ | Unit -> Val expr
     | Var v ->
         (match (Map.tryFind v env) with
         | Some e -> e
@@ -55,10 +60,18 @@ let rec eval expr env =
                 sprintf "reference to unknown variable '%s'" v
             in
             raise (EvalError msg))
+    | LetIn (name, value, body) ->
+        eval body (Map.add name (eval value env) env) 
     | Binop (l, op, r) ->
         evalBinop (l, op, r) env
-    | LetIn (name, value, body) ->
-        eval body (Map.add name (eval value env) env)
+    | IfThen (cond, e1, e2) ->
+        match eval cond env with
+        | Val (Bool b) ->
+            if b then (eval e1 env) else (eval e2 env)
+        | _ ->
+            let msg =
+                sprintf "expected condition to be a boolean in '(%s)'" (expr.ToString ())
+            in raise (EvalError msg)
     | Fun _ ->
         close expr env
     | Apply (e1, e2) ->

@@ -18,11 +18,17 @@ let ident = letter (letter | digit | symbol)*
 rule tokenize = parse
 | whitespace            { tokenize lexbuf }
 | real                  { lexeme lexbuf |> System.Double.Parse |> NUMBER }
+| "true"                { TRUE }
+| "false"               { FALSE }
+| "()"                  { UNIT }
 | '('                   { LPAREN }
 | ')'                   { RPAREN }
 | "let"                 { LET }
 | "in"                  { IN }
 | '='                   { EQUALS }
+| "if"                  { IF }
+| "then"                { THEN }
+| "else"                { ELSE } 
 | "fun"                 { FUN }
 | "->"                  { ARROW }
 | symbol+               { lexeme lexbuf |> OP }

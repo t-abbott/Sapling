@@ -1,0 +1,3 @@
+let f =
+    fun x -> if true then 42 else x
+in f 10 

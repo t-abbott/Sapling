@@ -5,8 +5,11 @@ open Incremental.Expr
 %token <float> NUMBER
 %token <string> OP
 %token <string> IDENT
+%token TRUE FALSE
+%token UNIT
 %token LPAREN RPAREN
 %token LET IN EQUALS
+%token IF THEN ELSE
 %token FUN ARROW
 %token EOF
 
@@ -20,8 +23,12 @@ open Incremental.Expr
 parse: expr EOF                         { $1 }
 
 expr: NUMBER                            { Number $1 }
+    | UNIT                              { Unit }
+    | TRUE                              { Bool true }
+    | FALSE                             { Bool false }
     | IDENT                             { Var $1 }
     | LPAREN expr RPAREN                { $2 }
+    | IF expr THEN expr ELSE expr       { IfThen ($2, $4, $6) }
     | expr OP expr                      { Binop ($1, $2, $3) }
     | LET IDENT EQUALS expr IN expr     { LetIn ($2, $4, $6) }
     | FUN IDENT ARROW expr              { Fun ($2, $4) }
