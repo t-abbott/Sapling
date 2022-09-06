@@ -14,7 +14,9 @@ and Neel Krishnaswami's [blog post](https://semantic-domain.blogspot.com/2015/07
 
 ## TODO
 
+- add multi-argument functions (sugared/core AST?)
 - fix parser ambiguity errors
-- make application have higher precedence than addition etc
+- make application have higher precedence than addition (and other things of that sort)
 - make closure ToString nice
-- add a test rig on the example files
+- write a test rig for the example files
+- compile to C? -> lambda lifting
