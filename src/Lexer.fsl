@@ -23,6 +23,15 @@ rule tokenize = parse
 | "()"                  { UNIT }
 | '('                   { LPAREN }
 | ')'                   { RPAREN }
+| '<'                   { LESSTHAN }
+| '>'                   { GREATERTHAN }
+| '+'                   { ADD }
+| '-'                   { SUB }
+| '*'                   { MULT }
+| '/'                   { DIV }
+| '%'                   { MOD }
+| "and"                 { AND }
+| "or"                  { OR }
 | "let"                 { LET }
 | "in"                  { IN }
 | '='                   { EQUALS }
@@ -31,7 +40,6 @@ rule tokenize = parse
 | "else"                { ELSE } 
 | "fun"                 { FUN }
 | "->"                  { ARROW }
-| symbol+               { lexeme lexbuf |> OP }
 | ident                 { lexeme lexbuf |> IDENT } 
 | eof                   { EOF }
 | _                     { lexeme lexbuf |> sprintf "parser error: %s" |> failwith }
