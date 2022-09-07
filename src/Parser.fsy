@@ -17,10 +17,9 @@ open Incremental.Expr
 
 %left MOD
 %nonassoc LESSTHAN GREATERTHAN EQUALS
-%left ADD SUB
 %left AND OR
+%left ADD SUB
 %left MULT DIV
-%left LPAREN
 
 %start parse
 %type <Incremental.Expr.T> parse

@@ -1,19 +1,15 @@
 ﻿open System
 open System.IO
-open FSharp.Text.Lexing
 
-open Incremental
+open Incremental.Parse
 open Incremental.Interp
+
 
 let usage = "dotnet run -- <file>"
 
-let parse (input : string) : Expr.T =
-    let lexbuf = LexBuffer<char>.FromString input in
-    Parser.parse Lexer.tokenize lexbuf
-
 let run file = 
     let ast = parse (File.ReadAllText file) in
-    let res = eval ast Map.empty in        
+    let res = Eval.eval ast Map.empty in        
     Console.WriteLine (ast.ToString ());
     Console.WriteLine (res.ToString ());
 
@@ -22,7 +18,10 @@ let printError (message : string) =
     
 [<EntryPoint>]
 let main argv =
-    if argv.Length <> 1 then
+    if argv.Length = 0 then
+        Repl.run ();
+        0
+    elif argv.Length > 1 then
         Console.Error.WriteLine usage;
         1
     else
