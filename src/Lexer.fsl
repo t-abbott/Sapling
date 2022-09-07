@@ -7,25 +7,39 @@ let lexeme lexbuf = LexBuffer<_>.LexemeString lexbuf
 
 let whitespace = [' ' '\t' '\n']
 
-let symbol = ['+' '-' '/' '*' '_' '?' '<' '>']
+let symbol = ['+' '-' '/' '*' '?' '<' '>']
 
 let digit = ['0' - '9']
 let real = '-'? digit+ ('.' digit+)?
 
 let letter = ['a'-'z' 'A'-'Z']
-let ident = letter (letter | digit | symbol)*
+let ident = (letter | '_') (letter | '_' | digit | symbol)*
 
 rule tokenize = parse
 | whitespace            { tokenize lexbuf }
 | real                  { lexeme lexbuf |> System.Double.Parse |> NUMBER }
+| "true"                { TRUE }
+| "false"               { FALSE }
+| "()"                  { UNIT }
 | '('                   { LPAREN }
 | ')'                   { RPAREN }
+| '<'                   { LESSTHAN }
+| '>'                   { GREATERTHAN }
+| '+'                   { ADD }
+| '-'                   { SUB }
+| '*'                   { MULT }
+| '/'                   { DIV }
+| '%'                   { MOD }
+| "and"                 { AND }
+| "or"                  { OR }
 | "let"                 { LET }
 | "in"                  { IN }
 | '='                   { EQUALS }
+| "if"                  { IF }
+| "then"                { THEN }
+| "else"                { ELSE } 
 | "fun"                 { FUN }
 | "->"                  { ARROW }
-| symbol+               { lexeme lexbuf |> OP }
 | ident                 { lexeme lexbuf |> IDENT } 
 | eof                   { EOF }
 | _                     { lexeme lexbuf |> sprintf "parser error: %s" |> failwith }

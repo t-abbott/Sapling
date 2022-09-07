@@ -1,0 +1,13 @@
+let makeClamp =
+    fun low -> 
+        (fun high -> 
+            (fun x -> 
+                if x > high then 
+                    high
+                else 
+                    (if x < low then
+                        low
+                    else 
+                        x)))
+in let f = (makeClamp 0) 10 in
+(f -4.5) + (f 100) 

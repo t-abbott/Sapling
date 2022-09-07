@@ -1,5 +1,6 @@
 module Incremental.Utils
 
+open System
 open System.Linq
 
 let without xs y = 
@@ -11,7 +12,7 @@ let dedupe xs =
 let union xs ys = 
     dedupe (xs @ ys)
 
-module Extensions = 
+module Extensions =
     type Map<'a, 'b when 'a : comparison> with
         member this.Pairs = Seq.zip (this.Keys) (this.Values) |> Seq.toList
 
