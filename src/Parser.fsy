@@ -15,7 +15,12 @@ open Incremental.Expr
 %token FUN ARROW
 %token EOF
 
-%left OP
+%left MOD
+%nonassoc LESSTHAN GREATERTHAN EQUALS
+%left ADD SUB
+%left AND OR
+%left MULT DIV
+%left LPAREN
 
 %start parse
 %type <Incremental.Expr.T> parse
@@ -24,13 +29,16 @@ open Incremental.Expr
 
 parse: expr EOF                         { $1 }
 
-expr: NUMBER                            { Number $1 }
+expr: expr exprnoapp                    { Apply ($1, $2) }
+    | exprnoapp                         { $1 }
+
+exprnoapp: 
+      NUMBER                            { Number $1 }
     | UNIT                              { Unit }
     | TRUE                              { Bool true }
     | FALSE                             { Bool false }
     | IDENT                             { Var $1 }
     | LPAREN expr RPAREN                { $2 }
-    | IF expr THEN expr ELSE expr       { IfThen ($2, $4, $6) }
     | expr LESSTHAN expr                { Binop ($1, LessThan, $3) }
     | expr GREATERTHAN expr             { Binop ($1, GreaterThan, $3) }
     | expr EQUALS expr                  { Binop ($1, Equals, $3)}
@@ -43,4 +51,4 @@ expr: NUMBER                            { Number $1 }
     | expr MOD expr                     { Binop ($1, Mod, $3) }
     | LET IDENT EQUALS expr IN expr     { LetIn ($2, $4, $6) }
     | FUN IDENT ARROW expr              { Fun ($2, $4) }
-    | expr expr                         { Apply ($1, $2) } 
+    | IF expr THEN expr ELSE expr       { IfThen ($2, $4, $6) }
