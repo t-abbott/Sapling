@@ -6,6 +6,9 @@ type Result<'a, 'b> =
     | Ok of 'a
     | Error of 'b
 
+let proj2 f (x, y) = f x, f y
+let proj3 f (x, y, z) = f x, f y, f z
+
 let without xs y = 
     List.filter (fun x -> x <> y) xs
 
@@ -18,6 +21,9 @@ let union xs ys =
 module Extensions =
     type Map<'a, 'b when 'a : comparison> with
         member this.Pairs = Seq.zip (this.Keys) (this.Values) |> Seq.toList
+
+        member this.Without key = 
+            this.Remove key
 
         /// Take the union of two maps `this` and `other`, with elements in
         /// `other` taking precedence
