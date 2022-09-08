@@ -1,7 +1,10 @@
 module Incremental.Utils
 
-open System
 open System.Linq
+
+type Result<'a, 'b> = 
+    | Ok of 'a
+    | Error of 'b
 
 let without xs y = 
     List.filter (fun x -> x <> y) xs
