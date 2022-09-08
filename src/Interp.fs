@@ -2,6 +2,8 @@ namespace Incremental.Interp
 
 open Incremental
 open Incremental.Expr
+open Incremental.Utils
+open Incremental.Utils.Extensions
 
 exception EvalError of string
 
@@ -12,11 +14,50 @@ module Env =
     and EnvVal =
         | Val of Expr.T
         | Closure of Expr.T * T
+        with 
+            override this.ToString () =
+                    match this with
+                    | Val e -> e.ToString ()
+                    | Closure (expr, env) ->
+                        // this works for now since we're not changing the ast at all.
+                        // Will break if we fix name capture or start optimising things
+                        (EnvVal.Substitute expr env).ToString ()
 
+            /// <summary>
+            /// Substitute variables in `expr` for the expressions they map to in `env`
+            /// </summary>
+            /// <remark>Used for pretty-printing, not evaluation</remark>
+            static member Substitute (expr : Expr.T) (env : T) =
+                match expr with
+                | Unit | Bool _ | Number _ -> expr 
+                | Var v ->
+                    match env.TryFind v with
+                    | None -> Var v
+                    | Some (Val expr') ->
+                        expr'
+                    | Some (Closure (expr', env')) ->
+                        EnvVal.Substitute expr' env'
+                | LetIn (name, e, body) ->
+                    let body' = EnvVal.Substitute body (env.Without name) in
+                    LetIn(name, e, body')
+                | Binop (l, op, r) ->
+                    let l', r' = proj2 (fun e -> EnvVal.Substitute e env) (l, r) in
+                    Binop (l', op, r')
+                | IfThen (cond, e1, e2) ->
+                    let cond', e1', e2' = proj3 (fun e -> EnvVal.Substitute e env) (cond, e1, e2) in
+                    IfThen (cond', e1', e2')
+                | Fun (name, body) ->
+                    let body' = EnvVal.Substitute body (env.Without name) in
+                    Fun (name, body')
+                | Apply (f, x) ->
+                    let f', x' = proj2 (fun e -> EnvVal.Substitute e env) (f, x) in
+                    Apply (f', x')
+
+    let substitute = EnvVal.Substitute
+    
     let empty = Map.empty
 
     let close (expr : Expr.T) env = Closure (expr, env)
-
 
 module Eval = 
     /// Evaluate an expression `expr` with respect to an environment `env`

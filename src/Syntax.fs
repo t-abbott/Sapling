@@ -68,6 +68,7 @@ module Expr =
                 | Apply (e1, e2) ->
                     sprintf "(%s %s)" (e1.ToString ()) (e2.ToString ())
 
-    let is_value = function 
-        | Number _ | Bool _ | Unit -> true
-        | _ -> false
+            member this.is_value =
+                match this with
+                | Unit | Bool _ | Number _ -> true
+                | _ -> false

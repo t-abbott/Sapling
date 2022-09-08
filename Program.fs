@@ -21,7 +21,7 @@ let main argv =
     if argv.Length = 0 then
         Repl.run ();
         0
-    elif argv.Length > 1 then
+    elif argv.Length > 1 || argv[0] = "--help" then
         Console.Error.WriteLine usage;
         1
     else
