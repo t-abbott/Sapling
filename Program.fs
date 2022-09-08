@@ -9,9 +9,9 @@ let usage = "dotnet run -- <file>"
 
 let run file = 
     let ast = parse (File.ReadAllText file) in
-    let res = Eval.eval ast Map.empty in        
-    Console.WriteLine (ast.ToString ());
-    Console.WriteLine (res.ToString ());
+    let res = Eval.run ast in        
+    // Console.WriteLine (ast.ToString ());
+    Console.WriteLine (res.ToString ())
 
 let printError (message : string) =
     Console.Error.WriteLine ("error: " + message)
