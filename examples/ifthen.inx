@@ -9,5 +9,5 @@ let makeClamp =
                         low
                     else 
                         x)))
-in let f = (makeClamp 0) 10 in
-(f -4.5) + (f 100) 
+in let clamp = (makeClamp 0) 10 in
+(clamp -4.5) + (clamp 100) 

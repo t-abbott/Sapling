@@ -9,7 +9,7 @@ let usage = "dotnet run -- <file>"
 
 let run file = 
     let ast = parse (File.ReadAllText file) in
-    let res = Eval.run ast in        
+    let res = (Eval.run ast).Value in        
     // Console.WriteLine (ast.ToString ());
     Console.WriteLine (res.ToString ())
 
