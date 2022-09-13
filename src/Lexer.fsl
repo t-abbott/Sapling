@@ -33,6 +33,7 @@ rule tokenize = parse
 | "and"                 { AND }
 | "or"                  { OR }
 | "let"                 { LET }
+| "dyn"                 { DYNAMIC }
 | "in"                  { IN }
 | '='                   { EQUALS }
 | "if"                  { IF }

@@ -8,6 +8,7 @@
     <FsLexOutputFolder>$(IntermediateOutputPath)src/</FsLexOutputFolder>
   </PropertyGroup>
   <ItemGroup>
+    <Compile Include="src/Cell.fs" />
     <Compile Include="src/Utils.fs" />
     <FsYacc Include="src/Parser.fsy">
       <OtherFlags>--module Parser</OtherFlags>
@@ -15,12 +16,11 @@
     <FsLex Include="src/Lexer.fsl">
       <OtherFlags>--module Lexer --unicode</OtherFlags>
     </FsLex>
-    <Compile Include="src/Syntax.fs" />
+    <Compile Include="src/Expr.fs" />
     <Compile Include="src/Parser.fsi" />
     <Compile Include="src/Parser.fs" />
     <Compile Include="src/Lexer.fs" />
     <Compile Include="src/Parse.fs" />
-    <Compile Include="src/Builtins.fs" />
     <Compile Include="src/Interp.fs" />
     <Compile Include="Program.fs" />
   </ItemGroup>
