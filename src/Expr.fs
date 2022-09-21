@@ -2,9 +2,14 @@ namespace Incremental.Expr
 
 open System
 open Incremental.Cell
+open Incremental.Utils
+
 
 /// Represents the name of a value
 type Name = string
+
+type BuiltinErrMsg = { name: Name; message: string }
+exception BuiltinError of BuiltinErrMsg
 
 /// Binary operators
 type Op =
@@ -51,7 +56,6 @@ type Expr =
     | Bool of bool
     | Number of float
     | Var of Name
-    | Dyn of Cell.T<Expr>
     | LetIn of Name * Expr * Expr
     | LetDynIn of Name * Expr * Expr
     | Binop of Expr * Op * Expr
@@ -65,7 +69,6 @@ type Expr =
         | Bool b -> string b
         | Number n -> string n
         | Var v -> v
-        | Dyn c -> c.body.ToString()
         | LetIn (name, e, body) -> sprintf "let %s = %s in %s" name (e.ToString()) (body.ToString())
         | LetDynIn (name, e, body) -> sprintf "let dyn %s = %s in %s" name (e.ToString()) (body.ToString())
         | Binop (l, op, r) -> sprintf "(%s %s %s)" (l.ToString()) (op.ToString()) (r.ToString())
@@ -97,61 +100,67 @@ and Env =
     /// Create a closure from an expression and environment
     static member close expr env = Closure(expr, env)
 
-
 /// Expression values
 and EnvVal =
     | Uninitialised
     | Val of Expr
     | Closure of Expr * Env
+    | Dyn of Cell.T<EnvVal> * Env
     | BuiltIn of Builtin
 
     override this.ToString() =
         match this with
         | Uninitialised -> "[uninitialised]"
         | Val e -> e.ToString()
-        | Closure (_, _) ->
-            // TODO fix closure pretty printing. `ToString` doesn't let
-            // us pass the names of the parent variables the closure is
-            // defined in so you can't avoid expanding recursive definitions
-            "[closure]"
+        | Closure (_, _) -> "[closure]"
+        | Dyn (_, _) -> "[dynamic]"
         | BuiltIn b -> b.ToString()
 
 and Builtin =
-    // TODO: make builtins take envvals as arguments
     { name: string
-      body: Expr -> EnvVal }
+      body: EnvVal ref -> Env -> EnvVal ref }
 
     override this.ToString() = sprintf "[builtin %s]" this.name
 
     /// Read a number from stdin and return it as a `Number`
-    static member getNum(_: Expr) : EnvVal =
+    static member getNum _ _ =
         let input = Console.ReadLine()
 
         try
             let n = Double.Parse input
-            Val(Number n)
+            ref (Val(Number n))
         with :? FormatException ->
-            raise (Exception("couldn't parse number " + input))
+            raise (
+                BuiltinError
+                    { name = "getNum"
+                      message = "couldn't parse input '" + input + "'" }
+            )
 
     /// Prints a value to the console
-    static member print(e: Expr) : EnvVal =
-        Console.WriteLine(e.ToString())
-        Val Unit
+    static member print (expr: EnvVal ref) _ =
+        Console.WriteLine(expr.Value.ToString())
+        ref (Val Unit)
 
-    /// Returns a new builtin function that updates the dynamic cell `cell`
-    static member set(e: Expr) : EnvVal =
+    /// Returns a new builtin function that modifies the dynamic cell `cell`
+    static member set (value: EnvVal ref) _ =
         let cell =
-            match e with
-            | Dyn c -> c
-            | _ -> raise (Exception "can't update a non-dynamic value")
+            match value.Value with
+            | Dyn (c, _) -> c
+            | _ ->
+                raise (
+                    BuiltinError
+                        { name = "set"
+                          message = "can't update a non-dynamic value" }
+                )
 
-        let name = "_doSet_" + string cell.id
+        let fname = "_doSet_" + string cell.id
 
-        let f expr =
-            cell.Set expr
-            Val Unit in
+        let doSet (newVal: EnvVal ref) (env: Env) : EnvVal ref =
+            cell.Set(newVal.Value)
+            value.Value <- Dyn(cell, env)
+            ref (Val Unit) in
 
-        BuiltIn { name = name; body = f }
+        ref (BuiltIn { name = fname; body = doSet })
 
     static member functions =
         [ { name = "getNum"

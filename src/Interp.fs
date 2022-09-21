@@ -1,5 +1,6 @@
 namespace Incremental.Interp
 
+open System
 open Incremental
 open Incremental.Cell
 open Incremental.Expr
@@ -10,54 +11,77 @@ exception EvalError of string
 
 module Eval =
     /// Evaluate an expression `expr` with respect to an environment `env`
+    /// TODO make this return a list of the dynamic cells touched
     let rec eval expr (Env env) =
+        log (sprintf "eval %s" (expr.ToString()))
+
         match expr with
         | Number _
         | Bool _
         | Unit -> ref (Val expr)
         | Var v ->
-            (match (Map.tryFind v env) with
-             | Some e -> e
-             | None -> let msg = sprintf "reference to unknown variable '%s'" v in raise (EvalError msg))
-        | Dyn cell -> failwith "not implemented"
+            // evaluate a dynamic cell when referenced
+            match env.TryFind v with
+            | Some ({ contents = Dyn (cell, env') }) -> evalCell cell env'
+            | Some e -> e
+            | None -> let msg = sprintf "reference to unbound variable: '%s'" v in raise (EvalError msg)
+
         | LetIn (name, e, body) ->
             // bind the name `name` to the value `e` in the expression `body`
             // since `e` can reference itself via `name` we need to evaluate it to a closure
             // first, and then add `name` to point to
-            let placeholder = ref EnvVal.Uninitialised in
+            let placeholder = ref Uninitialised in
             let env' = Map.add name placeholder env in
-            let boundVal = (eval e (Env env')).Value in // TODO prevent recursive variable definitions
+            let boundVal = (eval e (Env env')).Value in // TODO prevent recursive non-function definitions
             let () = placeholder.Value <- boundVal in
             eval body (Env env')
-        | LetDynIn (name, e, body) -> raise (EvalError "dyn expressions not implemented")
+
+        | LetDynIn (name, e, body) ->
+            // create a thunk from the dynamic expression `e` to be
+            // evaluated later
+            let cell = Cell.from (Val e)
+            let value = Dyn(cell, (Env env))
+            let env' = Map.add name (ref value) env
+            eval body (Env env')
+
         | Binop (l, op, r) -> evalBinop (l, op, r) (Env env)
         | IfThen (cond, e1, e2) ->
             match eval cond (Env env) with
-            | { contents = EnvVal.Val (Bool b) } -> if b then (eval e1 (Env env)) else (eval e2 (Env env))
+            | { contents = Val (Bool b) } -> if b then (eval e1 (Env env)) else (eval e2 (Env env))
             | _ ->
                 let msg =
                     sprintf "expected condition to reduce to a bool in '(%s)'" (expr.ToString()) in
 
                 raise (EvalError msg)
+
         | Fun _ -> ref (Env.close expr (Env env))
         | Apply (e1, e2) ->
-            // TODO refactor to match on `(eval expr exv).Value`
-            let arg = eval e2 (Env env) in
+            let arg = eval e2 (Env env)
 
-            match eval e1 (Env env) with
-            | { contents = Closure ((Fun (name, body)), (Env closedEnv)) } ->
-                eval (body) (Env(Map.add name arg closedEnv))
-            | { contents = BuiltIn b } ->
-                let arg' =
-                    match arg with
-                    | { contents = EnvVal.Val v } -> v
-                    | _ ->
-                        let msg = sprintf "can only apply values to builtin, got '%s'" (e2.ToString()) in
+            // I think this is the problem:
+            // in eagerly evaluating the argument we get the current value of the cell,
+            // but if we're calling `set` we need to pass the reference to the cell itself
+            // so do we pass the argument dn then evaluate it?
 
-                        raise (EvalError msg)
+            match (eval e1 (Env env)).Value with
+            | Closure ((Fun (name, body)), (Env closedEnv)) -> eval (body) (Env(Map.add name arg closedEnv))
+            | BuiltIn b ->
+                log (sprintf "calling builtin %s" (arg.Value.ToString()))
+                log (sprintf "%s -> %s" (e2.ToString()) (arg.Value.ToString()))
 
-                let res = b.body arg' in
-                ref res
+                try
+                    if b.name = "set" then
+                        match (e2) with
+                        | Var x ->
+                            match env.TryFind x with
+                            | Some { contents = Dyn (cell, env') } -> b.body (ref (Dyn(cell, env'))) (Env env)
+                            | _ -> failwith "no"
+                        | _ -> failwith "no"
+                    else
+                        b.body arg (Env env)
+                with BuiltinError err ->
+                    let msg = sprintf "error calling '%s': %s" err.name err.message
+                    raise (EvalError msg)
             | _ ->
                 let msg =
                     sprintf
@@ -102,21 +126,26 @@ module Eval =
             let msg =
                 sprintf "expected expression to reduce to a boolean: '%s'" (expr.ToString()) in raise (EvalError msg)
 
-    ///
-    and getCell (cell: Cell.T<Expr>) : Expr =
-        match cell.value with
-        | Some v -> v
-        | None ->
-            // eval the cell
-            // does it need an env? can a cell capture names? yes; fuck.
-            failwith "no"
+    /// Get the current value of a cell, updating its value if it has been invalidated
+    and evalCell (cell: Cell.T<EnvVal>) (Env env) : EnvVal ref =
+        log (sprintf "evaluating cell %s" (string cell.id))
+        log (cell.ToString())
+
+        match cell.value, cell.body with
+        | Some v, _ -> ref v
+        | None, (Val body) ->
+            let e = eval body (Env env)
+            cell.value <- (Some e.Value)
+            log (sprintf "evaluated cell, got %s" (e.Value.ToString()))
+            e
+        | _ -> failwith "unreachable"
+
 
     ///
     let run expr = eval expr Env.initial
 
 
 module Repl =
-    open System
     open Incremental.Parse
 
     let eval input =

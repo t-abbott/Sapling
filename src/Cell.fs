@@ -5,7 +5,7 @@ module Cell =
         {
             id: System.Guid
 
-            /// The expression
+            /// A dynamic expression
             mutable body: 'a
 
             /// The cached value of this `Cell`
@@ -18,17 +18,12 @@ module Cell =
             mutable observers: 'a T list
         }
 
-        ///
-        static member fromValue x =
-            { id = System.Guid.NewGuid()
-              body = x
-              value = None
-              reads = []
-              observers = [] }
-
         /// Remove `cell` as an observer of `observedCell`
         static member removeObserver cell observedCell =
             observedCell.observers <- List.filter (fun o -> o.id <> cell.id) observedCell.observers
+
+        member this.AddObserver cell =
+            this.observers <- cell :: this.observers
 
         /// Invalidate `this` cell and it's dependencies
         member this.Invalidate() =
@@ -42,3 +37,11 @@ module Cell =
         member this.Set expr =
             this.Invalidate()
             this.body <- expr
+
+    ///
+    let from x =
+        { id = System.Guid.NewGuid()
+          body = x
+          value = None
+          reads = []
+          observers = [] }

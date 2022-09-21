@@ -12,6 +12,11 @@ and Neel Krishnaswami's [blog post](https://semantic-domain.blogspot.com/2015/07
 
 `dotnet run -- <file>`
 
+# thoughts:
+
+- the recursive definitions are handled means lots of `refs` everywhere, which isn't very nice
+- algebraic effects could be a nice way of handling cell invalidation at the language level
+
 ## TODO
 
 - make parser and lexer errors nice
