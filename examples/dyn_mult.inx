@@ -1,0 +1,6 @@
+let dyn x = 0 in
+let dyn c = 10 in
+let _ = print (x * c) in
+let _ = (set x) (getNum ()) in
+x * c
+

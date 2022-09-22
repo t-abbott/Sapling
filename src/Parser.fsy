@@ -10,7 +10,7 @@ open Incremental.Expr
 %token LESSTHAN GREATERTHAN 
 %token AND OR
 %token ADD SUB MULT DIV MOD
-%token LET IN EQUALS
+%token LET DYNAMIC IN EQUALS
 %token IF THEN ELSE
 %token FUN ARROW
 %token EOF
@@ -22,32 +22,33 @@ open Incremental.Expr
 %left MULT DIV
 
 %start parse
-%type <Incremental.Expr.T> parse
+%type <Incremental.Expr.Expr> parse
 
 %%
 
-parse: expr EOF                         { $1 }
+parse: expr EOF                             { $1 }
 
-expr: expr exprnoapp                    { Apply ($1, $2) }
-    | exprnoapp                         { $1 }
+expr: expr exprnoapp                        { Apply ($1, $2) }
+    | exprnoapp                             { $1 }
 
 exprnoapp: 
-      NUMBER                            { Number $1 }
-    | UNIT                              { Unit }
-    | TRUE                              { Bool true }
-    | FALSE                             { Bool false }
-    | IDENT                             { Var $1 }
-    | LPAREN expr RPAREN                { $2 }
-    | expr LESSTHAN expr                { Binop ($1, LessThan, $3) }
-    | expr GREATERTHAN expr             { Binop ($1, GreaterThan, $3) }
-    | expr EQUALS expr                  { Binop ($1, Equals, $3)}
-    | expr AND expr                     { Binop ($1, And, $3) }
-    | expr OR expr                      { Binop ($1, Or, $3) }
-    | expr ADD expr                     { Binop ($1, Add, $3) }
-    | expr SUB expr                     { Binop ($1, Sub, $3) }
-    | expr MULT expr                    { Binop ($1, Mult, $3) }
-    | expr DIV expr                     { Binop ($1, Div, $3) }
-    | expr MOD expr                     { Binop ($1, Mod, $3) }
-    | LET IDENT EQUALS expr IN expr     { LetIn ($2, $4, $6) }
-    | FUN IDENT ARROW expr              { Fun ($2, $4) }
-    | IF expr THEN expr ELSE expr       { IfThen ($2, $4, $6) }
+      NUMBER                                { Number $1 }
+    | UNIT                                  { Unit }
+    | TRUE                                  { Bool true }
+    | FALSE                                 { Bool false }
+    | IDENT                                 { Var $1 }
+    | LPAREN expr RPAREN                    { $2 }
+    | expr LESSTHAN expr                    { Binop ($1, LessThan, $3) }
+    | expr GREATERTHAN expr                 { Binop ($1, GreaterThan, $3) }
+    | expr EQUALS expr                      { Binop ($1, Equals, $3)}
+    | expr AND expr                         { Binop ($1, And, $3) }
+    | expr OR expr                          { Binop ($1, Or, $3) }
+    | expr ADD expr                         { Binop ($1, Add, $3) }
+    | expr SUB expr                         { Binop ($1, Sub, $3) }
+    | expr MULT expr                        { Binop ($1, Mult, $3) }
+    | expr DIV expr                         { Binop ($1, Div, $3) }
+    | expr MOD expr                         { Binop ($1, Mod, $3) }
+    | LET IDENT EQUALS expr IN expr         { LetIn ($2, $4, $6) }
+    | LET DYNAMIC IDENT EQUALS expr IN expr { LetDynIn ($3, $5, $7) }
+    | FUN IDENT ARROW expr                  { Fun ($2, $4) }
+    | IF expr THEN expr ELSE expr           { IfThen ($2, $4, $6) }

@@ -1,137 +1,112 @@
 namespace Incremental.Interp
 
+open System
 open Incremental
+open Incremental.Cell
 open Incremental.Expr
 open Incremental.Utils
-open Incremental.Utils.Extensions
 
 exception EvalError of string
 
-module Env =
-    /// <summary>Represents an environment mapping names to their values</summary>
-    /// <remark>The actual values are mutable because of how we implement recursion</remark>
-    type T = Map<Name, EnvVal ref>
-
-    /// Expression values
-    and EnvVal =
-        | Uninitialised
-        | Val of Expr.T
-        | Closure of Expr.T * T
-        | BuiltIn of Builtin.T
-
-        override this.ToString() =
-            match this with
-            | Uninitialised -> "[uninitialised]"
-            | Val e -> e.ToString()
-            | Closure (expr, env) ->
-                // TODO fix closure pretty printing. `ToString` doesn't let
-                // us pass the names of the parent variables the closure is
-                // defined in so you can't avoid expanding recursive definitions
-                "[closure]"
-            | BuiltIn b -> b.ToString()
-
-        /// <summary>
-        /// Substitute variables in `expr` for the expressions they map to in `env` without
-        /// expanding the definitions of variables in `parentNames` (to avoid expanding
-        /// recursive definitions).
-        /// </summary>
-        /// TODO: why is this in envval? move it out
-        static member SubWithName (expr: Expr.T) (env: T) (parentNames: Set<Expr.Name>) =
-            System.Console.WriteLine(sprintf "expr: %s \tparent names: %s" (expr.ToString()) (parentNames.ToString()))
-
-            match expr with
-            | Unit
-            | Bool _
-            | Number _ -> expr
-            | Var name when parentNames.Contains name ->
-                // don't expand recursive definitions (`name` is defined within `parentName`)
-                Var name
-            | Var name ->
-                (match env.TryFind name with
-                 | None -> Var name
-                 | Some ({ contents = Val expr' }) -> expr'
-                 | Some ({ contents = Closure (expr', env') }) -> EnvVal.SubWithName expr' env' parentNames
-                 | Some ({ contents = envval }) -> Var(envval.ToString()))
-            | LetIn (name, e, body) ->
-                let body' = EnvVal.SubWithName body (env.Without name) (parentNames.Add name) in LetIn(name, e, body')
-            | Binop (l, op, r) ->
-                let l', r' = proj2 (fun e -> EnvVal.SubWithName e env parentNames) (l, r) in Binop(l', op, r')
-            | IfThen (cond, e1, e2) ->
-                let cond', e1', e2' =
-                    proj3 (fun e -> EnvVal.SubWithName e env parentNames) (cond, e1, e2) in IfThen(cond', e1', e2')
-            | Fun (name, body) -> let body' = EnvVal.SubWithName body (env.Without name) parentNames in Fun(name, body')
-            | Apply (f, x) -> let f', x' = proj2 (fun e -> EnvVal.SubWithName e env parentNames) (f, x) in Apply(f', x')
-
-        /// <summary>
-        /// Substitute variables in `expr` for the expressions they map to in `env`
-        /// </summary>
-        /// <remark>
-        /// Used for pretty-printing, not evaluation. This method converts references
-        /// to built-in functions to prettiefied `Var` names
-        /// </remark>
-        static member Substitute expr env =
-            let _ = System.Console.WriteLine("substituting " + (expr.ToString())) in
-
-            EnvVal.SubWithName expr env Set.empty
-
-    let substitute = EnvVal.Substitute
-
-    let empty = Map.empty
-
-    /// Initial environment containing all built-in functions and variables
-    let initial =
-        Builtin.functions |> List.map (fun b -> b.name, ref (BuiltIn b)) |> Map.ofList
-
-    /// Create a closure from an expression and environment
-    let close (expr: Expr.T) env = Closure(expr, env)
 
 module Eval =
-    /// Evaluate an expression `expr` with respect to an environment `env`
-    let rec eval expr (env: Env.T) =
+    /// Evaluate an expression `expr` with respect to an environment `env`.
+    /// Returns the resulting value and a list of all dynamic cells touched
+    /// while evaluating `expr`
+    let rec eval expr (Env env) =
+        log (sprintf "eval %s" (expr.ToString()))
+
         match expr with
         | Number _
         | Bool _
-        | Unit -> ref (Env.Val expr)
+        | Unit -> ref (Val expr), []
         | Var v ->
-            (match (Map.tryFind v env) with
-             | Some e -> e
-             | None -> let msg = sprintf "reference to unknown variable '%s'" v in raise (EvalError msg))
+            // evaluate a dynamic cell when referenced
+            match env.TryFind v with
+            | Some ({ contents = Dyn (cell, env') }) ->
+                let res, touchedCells = evalCell cell env'
+                res, cell :: touchedCells
+            | Some e -> e, []
+            | None -> let msg = sprintf "reference to unbound variable: '%s'" v in raise (EvalError msg)
+
         | LetIn (name, e, body) ->
             // bind the name `name` to the value `e` in the expression `body`
             // since `e` can reference itself via `name` we need to evaluate it to a closure
             // first, and then add `name` to point to
-            let placeholder = ref Env.Uninitialised in
-            let env' = Map.add name placeholder env in
-            let boundVal = (eval e env').Value in // TODO prevent recursive variable definitions
-            let () = placeholder.Value <- boundVal in
-            eval body env'
-        | Binop (l, op, r) -> evalBinop (l, op, r) env
+            let placeholder = ref Uninitialised
+            let env' = Map.add name placeholder env
+            let boundVal, boundCells = eval e (Env env') // TODO prevent recursive non-function definitions
+            let () = placeholder.Value <- boundVal.Value
+
+            let res, resCells = eval body (Env env')
+            res, resCells @ boundCells
+
+        | LetDynIn (name, e, body) ->
+            // create a thunk from the dynamic expression `e` to be
+            // evaluated later
+            // We don't return the dynamic value `e` as a dependency since
+            // `body` doesn't necessarily use it
+
+            let cell = Cell.from (Val e)
+            let value = Dyn(cell, (Env env))
+            let env' = Map.add name (ref value) env
+            eval body (Env env')
+
+        | Binop (l, op, r) -> evalBinop (l, op, r) (Env env)
+
         | IfThen (cond, e1, e2) ->
-            match eval cond env with
-            | { contents = Env.Val (Bool b) } -> if b then (eval e1 env) else (eval e2 env)
+            let condVal, condCells = eval cond (Env env)
+
+            match condVal.Value with
+            | Val (Bool b) ->
+                //
+                let res, resCells =
+                    match b with
+                    | true -> eval e1 (Env env)
+                    | false -> eval e2 (Env env)
+
+                res, resCells @ condCells
+
             | _ ->
                 let msg =
                     sprintf "expected condition to reduce to a bool in '(%s)'" (expr.ToString()) in
 
                 raise (EvalError msg)
-        | Fun _ -> ref (Env.close expr env)
+
+        | Fun _ -> ref (Env.close expr (Env env)), []
+
         | Apply (e1, e2) ->
-            // TODO refactor to match on `(eval expr exv).Value`
-            let arg = eval e2 env in
+            let arg, argCells = eval e2 (Env env)
+            let func, _ = eval e1 (Env env)
 
-            match eval e1 env with
-            | { contents = Env.Closure ((Fun (name, body)), closedEnv) } -> eval (body) (Map.add name arg closedEnv)
-            | { contents = Env.BuiltIn b } ->
-                let arg' =
-                    match arg with
-                    | { contents = Env.Val v } -> v
-                    | _ ->
-                        let msg = sprintf "can only apply values to builtin, got '%s'" (e2.ToString()) in
+            match func.Value with
+            | Closure ((Fun (name, body)), (Env closedEnv)) ->
+                //
+                eval (body) (Env(Map.add name arg closedEnv))
+            | BuiltIn b ->
+                log (sprintf "calling builtin %s" (arg.Value.ToString()))
+                log (sprintf "%s -> %s" (e2.ToString()) (arg.Value.ToString()))
 
-                        raise (EvalError msg)
-
-                let res = b.body arg' in
-                ref (Env.Val res)
+                try
+                    // Special case - pass the `Cell.T` object directly to `set`,
+                    // rather than passing its value
+                    if b.name = "set" then
+                        match (e2) with
+                        | Var x ->
+                            match env.TryFind x with
+                            | Some { contents = Dyn (cell, env') } ->
+                                // `set` only returns unit, so one could argue that
+                                // an expression calling `set cell` doesn't necessarily
+                                // mean `cell` is a dependency. Hence we return an empty
+                                // list
+                                b.body (ref (Dyn(cell, env'))) (Env env), []
+                            | _ -> failwith "no"
+                        | _ -> failwith "no"
+                    else
+                        b.body arg (Env env), argCells
+                with BuiltinError err ->
+                    let msg = sprintf "error calling '%s': %s" err.name err.message
+                    raise (EvalError msg)
             | _ ->
                 let msg =
                     sprintf
@@ -141,45 +116,76 @@ module Eval =
     // TODO catch evalNumber/evalBool exceptions and display a better message
     and evalBinop (l, op, r) env =
         if op.hasNumericArgs then
-            let x, y = (evalNumber l env), (evalNumber r env) in
+            let (x, xCells), (y, yCells) = (evalNumber l env), (evalNumber r env) in
 
-            match op with
-            | LessThan -> Env.Val(Bool(x < y))
-            | GreaterThan -> Env.Val(Bool(x > y))
-            | Equals -> Env.Val(Bool(x = y))
-            | Add -> Env.Val(Number(x + y))
-            | Sub -> Env.Val(Number(x - y))
-            | Mult -> Env.Val(Number(x * y))
-            | Div -> Env.Val(Number(x / y))
-            | Mod -> Env.Val(Number(x % y))
-            | _ -> failwith "unreachable"
+            let res =
+                match op with
+                | LessThan -> Val(Bool(x < y))
+                | GreaterThan -> Val(Bool(x > y))
+                | Equals -> Val(Bool(x = y))
+                | Add -> Val(Number(x + y))
+                | Sub -> Val(Number(x - y))
+                | Mult -> Val(Number(x * y))
+                | Div -> Val(Number(x / y))
+                | Mod -> Val(Number(x % y))
+                | _ -> failwith "unreachable"
+
+            ref res, xCells @ yCells
         else
-            let p, q = (evalBool l env), (evalBool r env) in
+            let (p, pCells), (q, qCells) = (evalBool l env), (evalBool r env) in
 
-            match op with
-            | And -> Env.Val(Bool(p && q))
-            | Or -> Env.Val(Bool(p || q))
-            | _ -> failwith "unreachable"
-        |> ref
+            let res =
+                match op with
+                | And -> Val(Bool(p && q))
+                | Or -> Val(Bool(p || q))
+                | _ -> failwith "unreachable"
 
-    and evalNumber expr env =
-        match eval expr env with
-        | { contents = Env.Val (Number n) } -> n
+            ref res, pCells @ qCells
+
+    /// Evaluate an expression expected to reduce to a float
+    and evalNumber expr (Env env) : float * Cell.T<EnvVal> list =
+        let num, numCells = eval expr (Env env)
+
+        match num.Value with
+        | Val (Number n) -> n, numCells
         | _ ->
             let msg =
                 sprintf "expected expression to reduce to a number: '%s'" (expr.ToString()) in raise (EvalError msg)
 
-    and evalBool expr env =
-        match eval expr env with
-        | { contents = Env.Val (Bool b) } -> b
+    /// Evaluate an expression expected to reduce to a bool
+    and evalBool expr (Env env) : bool * Cell.T<EnvVal> list =
+        let bool, boolCells = eval expr (Env env)
+
+        match bool.Value with
+        | Val (Bool b) -> b, boolCells
         | _ ->
             let msg =
                 sprintf "expected expression to reduce to a boolean: '%s'" (expr.ToString()) in raise (EvalError msg)
 
-    let run expr = eval expr Env.initial
+    /// Get the current value of a cell, updating its value if it has been invalidated
+    and evalCell (cell: Cell.T<EnvVal>) (Env env) : EnvVal ref * Cell.T<EnvVal> list =
+        log (sprintf "evaluating cell %s" (cell.ToString()))
+
+        match cell.value, cell.body with
+        | Some v, _ -> ref v, cell.reads
+        | None, (Val body) ->
+            let e, touchedCells = eval body (Env env)
+            cell.value <- (Some e.Value)
+
+            // upadate `cell`s dependencies
+            cell.reads <- touchedCells
+            cell.RegisterObservers touchedCells
+
+            e, touchedCells
+        | _ -> failwith "unreachable"
+
+    ///
+    let run expr =
+        let res, _ = eval expr Env.initial
+        res
+
 
 module Repl =
-    open System
     open Incremental.Parse
 
     let eval input =

@@ -1,6 +1,9 @@
 module Incremental.Utils
 
+open System
 open System.Linq
+
+let log (message: string) = () // Console.Error.WriteLine("~ " + message)
 
 type Result<'a, 'b> =
     | Ok of 'a
