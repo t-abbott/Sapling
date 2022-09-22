@@ -22,8 +22,13 @@ module Cell =
         static member removeObserver cell observedCell =
             observedCell.observers <- List.filter (fun o -> o.id <> cell.id) observedCell.observers
 
-        member this.AddObserver cell =
-            this.observers <- cell :: this.observers
+        /// Set a cell `observer` as an observer of `this`
+        member this.AddObserver observer =
+            this.observers <- observer :: this.observers
+
+        /// Register the cell `this` as an observer of the cells `observedCells`
+        member this.RegisterObservers observedCells =
+            List.iter (fun (c: T<'a>) -> c.AddObserver this) observedCells
 
         /// Invalidate `this` cell and it's dependencies
         member this.Invalidate() =
@@ -45,3 +50,5 @@ module Cell =
           value = None
           reads = []
           observers = [] }
+
+    let equals c1 c2 = c1.id = c2.id

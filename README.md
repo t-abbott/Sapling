@@ -12,6 +12,8 @@ and Neel Krishnaswami's [blog post](https://semantic-domain.blogspot.com/2015/07
 
 `dotnet run -- <file>`
 
+https://github.com/fsprojects/FSharp.Data.Adaptive/discussions/102
+
 # thoughts:
 
 - the recursive definitions are handled means lots of `refs` everywhere, which isn't very nice
