@@ -1,0 +1,11 @@
+let dyn x = 1 in
+let dyn y = x * 2 in
+let dyn z = y * 2 in
+let _ = print x in
+let _ = print y in
+let _ = print z in 
+let _ = (set x) 2 in
+let _ = print x in
+let _ = print y in
+let _ = print z in
+()
