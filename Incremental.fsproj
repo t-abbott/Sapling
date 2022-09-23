@@ -11,8 +11,8 @@
   </PropertyGroup>
 
   <ItemGroup>
-    <Compile Include="src/Cell.fs" />
     <Compile Include="src/Utils.fs" />
+    <Compile Include="src/Cell.fs" />
  
     <FsYacc Include="src/Parser.fsy">
       <OtherFlags>--module Parser</OtherFlags>

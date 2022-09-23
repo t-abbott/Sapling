@@ -14,7 +14,7 @@ module Eval =
     /// Returns the resulting value and a list of all dynamic cells touched
     /// while evaluating `expr`
     let rec eval expr (Env env) =
-        Log.info (sprintf "eval %s" (expr.ToString()))
+        Log.debug (sprintf "evaluating '%s'" (expr.ToString()))
 
         match expr with
         | Number _
@@ -30,9 +30,9 @@ module Eval =
             | None -> let msg = sprintf "reference to unbound variable: '%s'" v in raise (EvalError msg)
 
         | LetIn (name, e, body) ->
-            // bind the name `name` to the value `e` in the expression `body`
-            // since `e` can reference itself via `name` we need to evaluate it to a closure
-            // first, and then add `name` to point to
+            // Bind the `name` to the value `e` in the expression `body`.
+            // Since `e` can reference itself via `name` (recursion), we evaluate
+            // `e` to a closure first and then point `name` to it in the env
             let placeholder = ref Uninitialised
             let env' = Map.add name placeholder env
             let boundVal, boundCells = eval e (Env env') // TODO prevent recursive non-function definitions
@@ -42,10 +42,11 @@ module Eval =
             res, resCells @ boundCells
 
         | LetDynIn (name, e, body) ->
-            // create a thunk from the dynamic expression `e` to be
-            // evaluated later
-            // We don't return the dynamic value `e` as a dependency since
-            // `body` doesn't necessarily use it
+            // Here we create a cell to wrap the dynamic expression `e`, but don't
+            // compute the value `e` reduces to (it's basically a thunk).
+            // `e` isn't returned as a dependency of this expression since `body`
+            // doesn't necessarily reference it, and the value of `body` is what this
+            // expression will evaluate to
 
             let cell = Cell.from (Val e)
             let value = Dyn(cell, (Env env))
@@ -59,7 +60,6 @@ module Eval =
 
             match condVal.Value with
             | Val (Bool b) ->
-                //
                 let res, resCells =
                     match b with
                     | true -> eval e1 (Env env)
@@ -69,39 +69,42 @@ module Eval =
 
             | _ ->
                 let msg =
-                    sprintf "expected condition to reduce to a bool in '(%s)'" (expr.ToString()) in
+                    sprintf "expected the condition to reduce to a bool in '(%s)'" (expr.ToString())
 
                 raise (EvalError msg)
 
         | Fun _ -> ref (Env.close expr (Env env)), []
 
         | Apply (e1, e2) ->
+            // FIX: look at this code again. Can `func` be dependent on anything?
+            // e.g. if it's a dynamically created closure
+
             let arg, argCells = eval e2 (Env env)
             let func, _ = eval e1 (Env env)
 
             match func.Value with
-            | Closure ((Fun (name, body)), (Env closedEnv)) ->
-                //
-                eval (body) (Env(Map.add name arg closedEnv))
+            | Closure ((Fun (name, body)), (Env closedEnv)) -> eval (body) (Env(Map.add name arg closedEnv))
             | BuiltIn b ->
-                Log.info (sprintf "calling builtin %s" (arg.Value.ToString()))
-                Log.info (sprintf "%s -> %s" (e2.ToString()) (arg.Value.ToString()))
+                Log.info (sprintf "calling builtin %s" b.name)
 
                 try
-                    // Special case - pass the `Cell.T` object directly to `set`,
-                    // rather than passing its value
+                    // `set` is a special case - it takes the `Cell.T` object directly,
+                    // rather than the value the cell represents
                     if b.name = "set" then
                         match (e2) with
                         | Var x ->
                             match env.TryFind x with
                             | Some { contents = Dyn (cell, env') } ->
-                                // `set` only returns unit, so one could argue that
-                                // an expression calling `set cell` doesn't necessarily
-                                // mean `cell` is a dependency. Hence we return an empty
-                                // list
+                                // `set` returns unit, so one could argue that an expression
+                                // calling `set cell` doesn't necessarily mean `cell` is a
+                                // dependency. Hence we return an empty list.
                                 b.body (ref (Dyn(cell, env'))) (Env env), []
-                            | _ -> failwith "no"
-                        | _ -> failwith "no"
+                            | _ ->
+                                let msg = sprintf "`set` expected a dynamic value, got '%s'" (e2.ToString())
+                                raise (EvalError msg)
+                        | _ ->
+                            let msg = sprintf "`set` expected a dynamic value, got '%s'" (e2.ToString())
+                            raise (EvalError msg)
                     else
                         b.body arg (Env env), argCells
                 with BuiltinError err ->
@@ -111,9 +114,12 @@ module Eval =
                 let msg =
                     sprintf
                         "tried to apply a value to something that isn't a function in expression '%s'"
-                        (expr.ToString()) in raise (EvalError msg)
+                        (expr.ToString())
 
-    // TODO catch evalNumber/evalBool exceptions and display a better message
+                raise (EvalError msg)
+
+    // TODO: catch evalNumber/evalBool exceptions and display a better message
+    /// Evaluate a binary operator
     and evalBinop (l, op, r) env =
         if op.hasNumericArgs then
             let (x, xCells), (y, yCells) = (evalNumber l env), (evalNumber r env) in
@@ -164,10 +170,12 @@ module Eval =
 
     /// Get the current value of a cell, updating its value if it has been invalidated
     and evalCell (cell: Cell.T<EnvVal>) (Env env) : EnvVal ref * Cell.T<EnvVal> list =
-        Log.info (sprintf "evaluating cell %s" (cell.ToString()))
+        let id = string cell.id
 
         match cell.value, cell.body with
-        | Some v, _ -> ref v, cell.reads
+        | Some v, _ ->
+            Log.debug (sprintf "found cached value for cell '%s'" id)
+            ref v, cell.reads
         | None, (Val body) ->
             let e, touchedCells = eval body (Env env)
             cell.value <- (Some e.Value)
@@ -176,20 +184,22 @@ module Eval =
             cell.reads <- touchedCells
             cell.RegisterObservers touchedCells
 
+            Log.debug (sprintf "computed cell '%s', touched %d other cells" id touchedCells.Length)
             e, touchedCells
         | _ -> failwith "unreachable"
 
-    ///
+    /// Evaluate an expression `expr`
     let run expr =
         let res, _ = eval expr Env.initial
-        res
+        res.Value
 
 
 module Repl =
     open Incremental.Parse
 
     let eval input =
-        let ast = parse input in
+        let ast = parse input
+        Log.debug "parsed input"
 
         try
             Ok(Eval.run ast)
@@ -203,10 +213,11 @@ module Repl =
         let input = Console.ReadLine() in
 
         if input = ".exit" then
+            Log.debug "exiting repl"
             ()
         else
             match eval input with
-            | Ok (res) -> Console.WriteLine(res.Value.ToString())
+            | Ok (res) -> Console.WriteLine(res.ToString())
             | Error (msg) -> Console.WriteLine msg
 
             run ()

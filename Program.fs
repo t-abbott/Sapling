@@ -23,7 +23,7 @@ let usage = argParser.PrintUsage()
 
 let run file =
     let ast = parse (File.ReadAllText file)
-    let res = (Eval.run ast).Value
+    let res = Eval.run ast
     Console.WriteLine(res.ToString())
 
 let printError (message: string) =
