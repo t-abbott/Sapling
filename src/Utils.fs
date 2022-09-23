@@ -11,31 +11,35 @@ module Log =
         | Debug
         | Error
 
-    /// Represents
+    /// Represents a destination for logs to be written to
     type Sink =
         { target: TextWriter }
 
         member this.Write(message: string) = this.target.Write message
 
     let nullSink = { target = StreamWriter.Null }
-    let defaultSink = { target = Console.Error }
+    let stderr = { target = Console.Error }
+    let stdout = { target = Console.Out }
+    let defaultSink = nullSink
 
     let _sinks =
         [ (Info, defaultSink); (Debug, defaultSink); (Error, defaultSink) ]
         |> dict
         |> Dictionary
 
-    // set all outptus
+    /// Set log output for all levels
     let setOutput target =
         Seq.iter (fun key -> _sinks[key] <- target) _sinks.Keys
 
-    //
+    // Set log output for the level `level`
     let setLevelOutput level target = _sinks[level] <- target
 
+    /// Format a log message to be printed
     let format message (level: Level) =
-        let time = DateTime.Now.ToString "yyyy/MM/dd HH:mm:ss"
+        let time = DateTime.Now.ToString "yyyy/MM/dd HH:mm:ss.fff"
         sprintf "%s [%s] %s\n" time (level.ToString()) message
 
+    /// Log a string `message` with level `level`
     let log level message =
         _sinks[ level ].Write(format message level)
 
