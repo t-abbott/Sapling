@@ -33,8 +33,8 @@ module Log =
     let setLevelOutput level target = _sinks[level] <- target
 
     let format message (level: Level) =
-        let time = DateTime.Now.ToString "yyyy-MM-dd HH:mm:ss"
-        sprintf "(%s) [%s] %s\n" time (level.ToString()) message
+        let time = DateTime.Now.ToString "yyyy/MM/dd HH:mm:ss"
+        sprintf "%s [%s] %s\n" time (level.ToString()) message
 
     let log level message =
         _sinks[ level ].Write(format message level)
