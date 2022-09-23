@@ -1,16 +1,29 @@
 ﻿open System
 open System.IO
 
+open Argu
+
+open Incremental.Utils
 open Incremental.Parse
 open Incremental.Interp
 
+///
+type Args =
+    | [<MainCommand>] File of string
+    | [<AltCommandLine("-v")>] Verbose
 
-let usage = "dotnet run -- <file>"
+    interface IArgParserTemplate with
+        member s.Usage =
+            match s with
+            | File _ -> "specify a file to execute"
+            | Verbose -> "toggle verbose output (logging)"
+
+let argParser = ArgumentParser.Create<Args>()
+let usage = argParser.PrintUsage()
 
 let run file =
-    let ast = parse (File.ReadAllText file) in
-    let res = (Eval.run ast).Value in
-    // Console.WriteLine (ast.ToString ());
+    let ast = parse (File.ReadAllText file)
+    let res = Eval.run ast
     Console.WriteLine(res.ToString())
 
 let printError (message: string) =
@@ -18,24 +31,31 @@ let printError (message: string) =
 
 [<EntryPoint>]
 let main argv =
-    match argv.Length with
-    | 0 ->
+    if argv.Length = 0 then
         Repl.run ()
         0
-    | 1 when argv[0] = "--help" ->
-        Console.Error.WriteLine usage
-        1
-    | 1 ->
+    else
         try
-            run argv[0]
+            let args = argParser.Parse argv
+
+            match args.Contains Verbose with
+            | true -> Log.setOutput Log.stderr
+            | false -> Log.setOutput Log.nullSink
+
+            run (args.GetResult File)
             0
         with
+        | :? ArguParseException as ex ->
+            if ex.ErrorCode = ErrorCode.HelpText then
+                Console.WriteLine usage
+                0
+            else
+                printError ex.Message
+                1
+
         | EvalError (message) ->
             printError message
             1
         | ex ->
             printError ex.Message
             1
-    | _ ->
-        Console.Error.WriteLine usage
-        1

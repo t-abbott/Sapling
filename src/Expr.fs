@@ -156,9 +156,11 @@ and Builtin =
         let fname = "_doSet_" + string cell.id
 
         let doSet (newVal: EnvVal ref) (env: Env) : EnvVal ref =
+            Log.debug (sprintf "updated cell '%s'" (string cell.id))
+
             cell.Set(newVal.Value)
             value.Value <- Dyn(cell, env)
-            ref (Val Unit) in
+            ref (Val Unit)
 
         ref (BuiltIn { name = fname; body = doSet })
 

@@ -1,5 +1,7 @@
 namespace Incremental.Cell
 
+open Incremental.Utils
+
 module Cell =
     type 'a T =
         {
@@ -32,8 +34,14 @@ module Cell =
 
         /// Invalidate `this` cell and it's dependencies
         member this.Invalidate() =
+            Log.debug (sprintf "invalidated cell '%s'" (string this.id))
+
+            // invalidate cells that depend on `this`
             List.iter (fun (o: 'a T) -> o.Invalidate()) this.observers
+
+            // remove `this` as an observer from other cells
             List.iter (fun (o: 'a T) -> T<'a>.removeObserver this o) this.reads
+
             this.value <- None
             this.observers <- []
             this.reads <- []
@@ -43,7 +51,7 @@ module Cell =
             this.Invalidate()
             this.body <- expr
 
-    ///
+    /// Create a new `Cell.T` from a value `x`
     let from x =
         { id = System.Guid.NewGuid()
           body = x

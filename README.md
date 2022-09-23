@@ -7,6 +7,7 @@ and Neel Krishnaswami's [blog post](https://semantic-domain.blogspot.com/2015/07
 ## Dependencies
 
 - `FsLexYacc`
+- `Argu`
 
 ## Use
 
