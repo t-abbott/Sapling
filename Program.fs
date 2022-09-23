@@ -1,6 +1,7 @@
 ﻿open System
 open System.IO
 
+open Incremental.Utils
 open Incremental.Parse
 open Incremental.Interp
 
@@ -18,6 +19,8 @@ let printError (message: string) =
 
 [<EntryPoint>]
 let main argv =
+    Log.setOutput Log.nullSink
+
     match argv.Length with
     | 0 ->
         Repl.run ()

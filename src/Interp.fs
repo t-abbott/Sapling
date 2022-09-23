@@ -14,7 +14,7 @@ module Eval =
     /// Returns the resulting value and a list of all dynamic cells touched
     /// while evaluating `expr`
     let rec eval expr (Env env) =
-        log (sprintf "eval %s" (expr.ToString()))
+        Log.info (sprintf "eval %s" (expr.ToString()))
 
         match expr with
         | Number _
@@ -84,8 +84,8 @@ module Eval =
                 //
                 eval (body) (Env(Map.add name arg closedEnv))
             | BuiltIn b ->
-                log (sprintf "calling builtin %s" (arg.Value.ToString()))
-                log (sprintf "%s -> %s" (e2.ToString()) (arg.Value.ToString()))
+                Log.info (sprintf "calling builtin %s" (arg.Value.ToString()))
+                Log.info (sprintf "%s -> %s" (e2.ToString()) (arg.Value.ToString()))
 
                 try
                     // Special case - pass the `Cell.T` object directly to `set`,
@@ -164,7 +164,7 @@ module Eval =
 
     /// Get the current value of a cell, updating its value if it has been invalidated
     and evalCell (cell: Cell.T<EnvVal>) (Env env) : EnvVal ref * Cell.T<EnvVal> list =
-        log (sprintf "evaluating cell %s" (cell.ToString()))
+        Log.info (sprintf "evaluating cell %s" (cell.ToString()))
 
         match cell.value, cell.body with
         | Some v, _ -> ref v, cell.reads

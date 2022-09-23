@@ -1,9 +1,47 @@
 module Incremental.Utils
 
 open System
+open System.IO
 open System.Linq
+open System.Collections.Generic
 
-let log (message: string) = () // Console.Error.WriteLine("~ " + message)
+module Log =
+    type Level =
+        | Info
+        | Debug
+        | Error
+
+    /// Represents
+    type Sink =
+        { target: TextWriter }
+
+        member this.Write(message: string) = this.target.Write message
+
+    let nullSink = { target = StreamWriter.Null }
+    let defaultSink = { target = Console.Error }
+
+    let _sinks =
+        [ (Info, defaultSink); (Debug, defaultSink); (Error, defaultSink) ]
+        |> dict
+        |> Dictionary
+
+    // set all outptus
+    let setOutput target =
+        Seq.iter (fun key -> _sinks[key] <- target) _sinks.Keys
+
+    //
+    let setLevelOutput level target = _sinks[level] <- target
+
+    let format message (level: Level) =
+        let time = DateTime.Now.ToString "yyyy-MM-dd HH:mm:ss"
+        sprintf "(%s) [%s] %s\n" time (level.ToString()) message
+
+    let log level message =
+        _sinks[ level ].Write(format message level)
+
+    let info = log Info
+    let debug = log Debug
+    let error = log Error
 
 type Result<'a, 'b> =
     | Ok of 'a
