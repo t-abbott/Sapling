@@ -22,12 +22,12 @@ or execute a file by running
 dotnet run -- <file>
 ```
 
-Some example programs are listed in `examples/`.
 ~~In either case ignore the shift/reduce error vomit.~~
 
-Alternatively, use `dotnet build` to create a dll in `bin/`.
-
+Some example programs are listed in `examples/`.
 Run with the `--help` flag to see usage information.
+
+Alternatively, use `dotnet build` to create a dll in `bin/`.
 
 # thoughts:
 
