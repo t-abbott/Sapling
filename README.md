@@ -1,7 +1,7 @@
 # Sapling
 
-An interpreter for a toy self-adjusting programming languge.
-Inspired by Neel Krishnaswami's [blog post](https://semantic-domain.blogspot.com/2015/07/how-to-implement-spreadsheet.html).
+An interpreter for a toy self-adjusting programming languge
+inspired by Neel Krishnaswami's [blog post](https://semantic-domain.blogspot.com/2015/07/how-to-implement-spreadsheet.html).
 
 ## Dependencies
 
@@ -26,8 +26,7 @@ dotnet run -- <file>
 
 Some example programs are listed in `examples/`.
 Run with the `--help` flag to see usage information.
-
-Alternatively, use `dotnet build` to create a dll in `bin/`.
+Alternatively use `dotnet build` to create a dll in `bin/`.
 
 # thoughts:
 
