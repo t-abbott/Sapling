@@ -36,7 +36,7 @@ Alternatively, use `dotnet build` to create a dll in `bin/`.
 
 ---
 
-[^1]: example output:
+[^1]: example:
 
     ```
     $ dotnet run
