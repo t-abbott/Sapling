@@ -198,13 +198,12 @@ module Repl =
     open Incremental.Parse
 
     let eval input =
-        let ast = parse input
-        Log.debug "parsed input"
-
         try
-            Ok(Eval.run ast)
-        with EvalError (msg) ->
-            Error(msg)
+            input |> parse |> Eval.run |> Ok
+        with
+        | EvalError (msg) -> Error(msg)
+        | ex -> Error(ex.Message)
+
 
     let writePrompt () = Console.Write "> "
 
@@ -218,6 +217,6 @@ module Repl =
         else
             match eval input with
             | Ok (res) -> Console.WriteLine(res.ToString())
-            | Error (msg) -> Console.WriteLine msg
+            | Error (msg) -> Console.WriteLine("error: " + msg)
 
             run ()
